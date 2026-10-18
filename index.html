@@ -476,46 +476,92 @@ function normalizeEvent(ev){
  normalized.status=normalized.settled>=value&&value>0?'pago':normalized.settled>0?'parcial':'pendente';
  return normalized;
 }
+
 function saveEvent(){
- let title=$('evTitle').value.trim(),date=$('evDate').value;
- if(!title||!date){$('eventMsg').textContent='Informe a descrição e a data.';return}
- let value=Math.max(0,Number($('evValue').value)||0),settled=Math.min(value,Math.max(0,Number($('evSettled').value)||0));
- let installments=null;
- if($('evInstallments').checked){
-  const count=Math.max(2,Math.min(120,parseInt($('evInstallmentCount').value,10)||2));
-  const firstDate=$('evInstallmentFirstDate').value||date;
-  const paid=[...document.querySelectorAll('[data-installment-paid]:checked')].map(x=>Number(x.dataset.installmentPaid));
-  const dates=Array.from({length:count},(_,i)=>{const field=document.querySelector(`[data-installment-date="${i}"]`);return field&&field.value?field.value:installmentDate(firstDate,i)});
-  installments={enabled:true,count,firstDate,paid,dates};
-  date=firstDate;
-  settled=0;
- }
- let obj={id:editingEventId||String(Date.now()),title,date,value,settled,type:$('evType').value,category:$('evCategory').value,icon:$('evIcon').value,reminder:$('evReminder').checked,priority:$('evPriority').checked,notes:$('evNotes').value.trim(),installments};
- obj=normalizeEvent(obj);
- if(editingEventId)events=events.map(x=>x.id===editingEventId?obj:x);else events.push(obj);
- persistEvents();$('eventMsg').textContent='
-persistEvents();
-if (window.AndroidReminders) {
-  const savedEvent = events.find(
-    ev => String(ev.id) === String(obj.id)
+  let title = $('evTitle').value.trim();
+  let date = $('evDate').value;
+
+  if(!title || !date){
+    $('eventMsg').textContent = 'Informe a descrição e a data.';
+    return;
+  }
+
+  let value = Math.max(0, Number($('evValue').value) || 0);
+  let settled = Math.min(
+    value,
+    Math.max(0, Number($('evSettled').value) || 0)
   );
-  if (savedEvent) {
+
+  let installments = null;
+
+  if($('evInstallments').checked){
+    const count = Math.max(
+      2,
+      Math.min(120, parseInt($('evInstallmentCount').value, 10) || 2)
+    );
+
+    const firstDate = $('evInstallmentFirstDate').value || date;
+    const paid = [
+      ...document.querySelectorAll('[data-installment-paid]:checked')
+    ].map(x => Number(x.dataset.installmentPaid));
+
+    const dates = Array.from({length: count}, (_, i) => {
+      const field = document.querySelector(
+        `[data-installment-date="${i}"]`
+      );
+      return field && field.value
+        ? field.value
+        : installmentDate(firstDate, i);
+    });
+
+    installments = {enabled: true, count, firstDate, paid, dates};
+    date = firstDate;
+    settled = 0;
+  }
+
+  let obj = {
+    id: editingEventId || String(Date.now()),
+    title,
+    date,
+    value,
+    settled,
+    type: $('evType').value,
+    category: $('evCategory').value,
+    icon: $('evIcon').value,
+    reminder: $('evReminder').checked,
+    priority: $('evPriority').checked,
+    notes: $('evNotes').value.trim(),
+    installments
+  };
+
+  obj = normalizeEvent(obj);
+
+  if(editingEventId){
+    events = events.map(x => x.id === editingEventId ? obj : x);
+  } else {
+    events.push(obj);
+  }
+
+  persistEvents();
+
+  if(window.AndroidReminders){
     window.AndroidReminders.scheduleReminder(
-      String(savedEvent.id),
-      String(savedEvent.title),
-      String(savedEvent.date),
-      savedEvent.reminder !== false &&
-      savedEvent.status !== 'pago'
+      String(obj.id),
+      String(obj.title),
+      String(obj.date),
+      obj.reminder !== false && obj.status !== 'pago'
     );
   }
+
+  $('eventMsg').textContent =
+    'Salvo. As parcelas e os valores foram atualizados.';
+
+  clearEventForm();
+  renderEvents();
+  renderCalendar();
+  checkReminders();
 }
-$('eventMsg').textContent='Salvo. As parcelas e os valores foram atualizados.';
-clearEventForm();
-renderEvents();
-renderCalendar();
-checkReminders();
-. As parcelas e os valores foram atualizados.';clearEventForm();renderEvents();renderCalendar();checkReminders()
-}
+
 function checkReminders(){let now=new Date(),tomorrow=new Date(now.getFullYear(),now.getMonth(),now.getDate()+1,12),target=dateKey(tomorrow),sent={};try{sent=JSON.parse(localStorage.getItem('meuTrabalhoGanhos_reminders_v1')||'{}')||{}}catch(e){}let due=events.filter(ev=>ev.status!=='pago'&&ev.reminder!==false&&ev.date===target&&!sent[ev.id]);if(!due.length)return;due.forEach(ev=>{let msg=`Amanhã: ${ev.icon||'⭐'} ${ev.title}${Number(ev.value)>0?' · '+money(ev.value):''}`;if('Notification' in window&&Notification.permission==='granted'){try{new Notification('Lembrete — Meu Trabalho & Ganhos',{body:msg,tag:'mtg-'+ev.id});sent[ev.id]=target}catch(e){}}else{console.info('Lembrete de amanhã:',msg)}});try{localStorage.setItem('meuTrabalhoGanhos_reminders_v1',JSON.stringify(sent))}catch(e){}if(due.length)$('eventMsg').textContent='Você tem '+due.length+' lembrete(s) para amanhã. Confira os eventos pendentes.'}
 async function requestNotifications(){if(!('Notification' in window)){$('eventMsg').textContent='Este navegador não oferece notificações. Os lembretes aparecem dentro do aplicativo.';return}try{let p=await Notification.requestPermission();$('eventMsg').textContent=p==='granted'?'Notificações permitidas. Os lembretes serão verificados quando o aplicativo estiver aberto.':'Permissão de notificações não concedida.';checkReminders()}catch(e){$('eventMsg').textContent='Não foi possível ativar notificações neste ambiente.'}}
 function openEventDetails(id){
